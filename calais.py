@@ -7,6 +7,7 @@ Last-Update: 01/12/2009
 import httplib, urllib, re
 import simplejson as json
 from StringIO import StringIO
+from xml.sax.saxutils import escape
 
 PARAMS_XML = """
 <c:params xmlns:c="http://s.opencalais.com/1/pred/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <c:processingDirectives %s> </c:processingDirectives> <c:userDirectives %s> </c:userDirectives> <c:externalMetadata %s> </c:externalMetadata> </c:params>
@@ -25,7 +26,7 @@ class Calais():
     Python class that knows how to talk to the OpenCalais API.  Use the analyze() and analyze_url() methods, which return CalaisResponse objects.  
     """
     api_key = None
-    processing_directives = {"contentType":"TEXT/RAW", "outputFormat":"application/json", "reltagBaseURL":None, "calculateRelevanceScore":"true", "enableMetadataType":None, "discardMetadata":None, "omitOutputtingOriginalText":"true"}
+    processing_directives = {"contentType":"TEXT/RAW", "outputFormat":"application/json", "reltagBaseURL":None, "calculateRelevanceScore":"true", "enableMetadataType":"SocialTags", "discardMetadata":None, "omitOutputtingOriginalText":"true"}
     user_directives = {"allowDistribution":"false", "allowSearch":"false", "externalID":None}
     external_metadata = {}
 
@@ -34,10 +35,10 @@ class Calais():
         self.user_directives["submitter"]=submitter
 
     def _get_params_XML(self):
-        return PARAMS_XML % (" ".join('c:%s="%s"' % (k,v) for (k,v) in self.processing_directives.items() if v), " ".join('c:%s="%s"' % (k,v) for (k,v) in self.user_directives.items() if v), " ".join('c:%s="%s"' % (k,v) for (k,v) in self.external_metadata.items() if v))
+        return PARAMS_XML % (" ".join('c:%s="%s"' % (k,escape(v)) for (k,v) in self.processing_directives.items() if v), " ".join('c:%s="%s"' % (k,escape(v)) for (k,v) in self.user_directives.items() if v), " ".join('c:%s="%s"' % (k,escape(v)) for (k,v) in self.external_metadata.items() if v))
 
     def rest_POST(self, content):
-        params = urllib.urlencode({'licenseID':self.api_key, 'content':content, 'paramsXML':self._get_params_XML()})
+        params = urllib.urlencode({'licenseID':self.api_key, 'content':content.encode('ascii', 'xmlcharrefreplace'), 'paramsXML':self._get_params_XML()})
         headers = {"Content-type":"application/x-www-form-urlencoded"}
         conn = httplib.HTTPConnection("api.opencalais.com:80")
         conn.request("POST", "/enlighten/rest/", params, headers)
@@ -78,6 +79,7 @@ class Calais():
         self.processing_directives["contentType"]=content_type
         if external_id:
             self.user_directives["externalID"] = external_id
+        
         return CalaisResponse(self.rest_POST(content))
 
     def analyze_url(self, url):
@@ -114,7 +116,7 @@ class CalaisResponse():
     
     def __init__(self, raw_result):
         try:
-            self.raw_response = json.load(StringIO(raw_result))
+            self.raw_response = json.load(StringIO(raw_result.decode('utf-8', "[removed]")), encoding="utf-8")
         except:
             raise ValueError(raw_result)
         self.simplified_response = self._simplify_json(self.raw_response)
@@ -176,3 +178,9 @@ class CalaisResponse():
                         print "\t%s:%s" % (k,v)
                     elif isinstance(v, dict) and v.has_key('name'):
                         print "\t%s:%s" % (k, v['name'])
+    
+    def print_social_tags(self):
+        if not hasattr(self, "socialTag"):
+            return None
+        for socialTag in self.socialTag:
+            print "%s %s" % (socialTag['name'], socialTag['importance'])

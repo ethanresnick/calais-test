@@ -1,10 +1,15 @@
 from calais import Calais
 import sys
 import string
+import codecs
+import re
 
 API_KEY = "t3d4ty47jkc7snnsmzt487qj"
 calais = Calais(API_KEY)
-toProcess = "".join(sys.stdin)
+
+def nl2p(s):
+    """Add paragraphs to a text."""
+    return u'\n'.join(u'<p>%s</p>' % p for p in re.compile(r'\n{1,}').split(s))
 
 def to_wikipedia_url(topic):
     return 'http://en.wikipedia.org/wiki/' + string.replace(topic, ' ', '_')
@@ -43,7 +48,7 @@ entities, I think it's more important here that every extracted entity be
 linked and discoverable in the output than it is that the text remain identical.
 """
 def annotate_text(text, calais):
-    entities = calais.analyze(toProcess).entities
+    entities = calais.analyze(text).entities
     entityUrls = {}
     instances = []
     annotated_text = ""
@@ -77,5 +82,16 @@ def annotate_text(text, calais):
 
     return annotated_text
 
-# Send the result to stdout.
-print annotate_text(toProcess, calais)
+# The python-calais module handles unicode strings by converting to ASCII,
+# and converting unmappable characters to their XML equivalents. I.e. it does
+# str.encode('ascii', 'xmlcharrefreplace'). We have to do the same on our
+# input text, which we'll insist is utf-8, so the character indices line up.
+text = (u"".join(codecs.getreader("utf-8")(sys.stdin))).encode('ascii', 'xmlcharrefreplace')
+annotated_html = nl2p(annotate_text(text, calais))
+
+# Send the result to stdout. 
+# (And, even though it's not strictly required, add
+# some HTML to make the thing readable in the browser.)
+print "<html><body style='max-width:40em;line-height:1.6em'>"
+print annotated_html
+print "</body></html>"
