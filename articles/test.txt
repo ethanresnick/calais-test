@@ -1,0 +1,1 @@
+The report should include a table of the three numbers — references, detected, correct — for each document, plus the totals of these three numbers across all documents. Also report on any patterns in the failures that your see. Where is OpenCalais most accurate? Where is it least accurate? Are there predictable patterns to the errors?
